@@ -11,20 +11,26 @@ import picamera
 from time import sleep
 import pygame
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
-GPIO.setup(14, GPIO.OUT) #Pi pin 14 connects to CEENBoT pin 14 (PD2)
-
+#-----GPIO Pins
 #Wait
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setup(2, GPIO.OUT) #output mode
+GPIO.setup(2, GPIO.OUT) #output mode- tells bluepill to perform tasks
 
-#PWM
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+GPIO.setup(3, GPIO.IN) #input mode- bluepill tells pi when to perform task
+
+#PWM for motors
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 GPIO.setup(18, GPIO.OUT) #output mode
-pwm = GPIO.PWM(18, 100) #PWM pin at 100Hz Frequency - necessary?
+fork = GPIO.PWM(18, 50) #fork lift motors PWM pin at 50Hz Frequency
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+GPIO.setup(12, GPIO.OUT)
+camera = GPIO.PWM(12, 50) #camera motor PWM pin at 50Hz Frequency
 
 #movement commands
 GPIO.setmode(GPIO.BCM)
@@ -34,6 +40,9 @@ GPIO.setup(14, GPIO.OUT) #output mode (LSB)
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 GPIO.setup(15, GPIO.OUT) #output mode (MSB)
+
+#------
+
 
 WIDTH = 1280
 HEIGHT = 1024
@@ -47,12 +56,33 @@ camera.vflip = False
 camera.hflip = False
 camera.brightness = 60
 
-# BUILD A SCREEN
-pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-black = pygame.Color(0, 0, 0)
-textcol = pygame.Color(255, 255, 0)
-screen.fill(black)
+
+def BuildAScreen():
+	global screen, black
+	pygame.init()
+	screen = pygame.display.set_mode((WIDTH, HEIGHT))
+	black = pygame.Color(0, 0, 0)
+	textcol = pygame.Color(255, 255, 0)
+	screen.fill(black)
+
+
+# BuildAScreen() - not necessary right now
+def imageProcessing():
+	global image, codes
+	image = Image.open(files)
+	# converts image to black and white
+	image = image.convert('L')
+	# inverts the image
+	image1 = ImageOps.invert(image)
+	image1.save('/home/pi/imageProcessing/potentialQRCode.png')
+	files1 = '/home/pi/imageProcessing/potentialQRCode.png'
+	image1 = open(files1, 'rb')
+	# checks again for a qr code
+	with image1:
+		image1 = Image.open(image1)
+		image1.load()
+	codes = zbarlight.scan_codes('qrcode', image1)
+
 
 #continuously take a picture
 while True:
@@ -61,18 +91,18 @@ while True:
 		
 		# TAKE A PHOTO
 		camera.start_preview()
-		sleep(2)
+		sleep(2) # potentially reduce time
 		camera.capture('/home/pi/imageProcessing/potentialQRCode.png', format='png')
-		screen.fill(black)
-		pygame.display.update()
-		camera.stop_preview()
+		#screen.fill(black)
+		#pygame.display.update()
+		#camera.stop_preview()
 
 		# READ IMAGE AND PUT ON SCREEN
-		img = pygame.image.load('/home/pi/imageProcessing/potentialQRCode.png')
-		screen.blit(img, (0, 0))
+		#img = pygame.image.load('/home/pi/imageProcessing/potentialQRCode.png')
+		#screen.blit(img, (0, 0))
 
-		#files = 'potentialQRCode.png'
 		files = '/home/pi/imageProcessing/potentialQRCode.png'
+
 		image = open(files, 'rb')
 		with image:
 			image = Image.open(image)
@@ -81,23 +111,8 @@ while True:
 		
 		#cannot find qr code
 		if codes == None:				
-			image = Image.open(files)
-			
-			#converts image to black and white
-			image = image.convert('L')
-			
-			#inverts the image
-			image1 = ImageOps.invert(image)
-			image1.save('/home/pi/imageProcessing/potentialQRCode.png')
-			
-			files1 = '/home/pi/imageProcessing/potentialQRCode.png'
-			image1 = open(files1, 'rb')
-			#checks again for a qr code
-			with image1:
-				image1 = Image.open(image1)
-				image1.load()
-
-			codes = zbarlight.scan_codes('qrcode', image1)
+			imageProcessing()
+		# necessary to check that code
 		if (codes != None):
 			qr_found = True
 			print "QR Code Found"
@@ -116,7 +131,7 @@ while True:
 			print "QR Code NOT Found"
 			GPIO.output(14, GPIO.LOW)
 			
-		image = Image.open('/home/pi/imageProcessing/potentialQRCode.png')
+		#image = Image.open('/home/pi/imageProcessing/potentialQRCode.png')
 
 # Will never be reached to avoid opening many browsers		
 urlCode = ', '.join(codes)
@@ -125,14 +140,20 @@ print('QR codes: %s' % codes)
 sleep(3)
 
 #_________			
-			#where to implement PWM?
-			dc = 0
-			pwm.start(dc)
-			for dc in range (50):
-				pwm.ChangeDutyCycle(dc) #necessary to change duty cycle?
-				time.sleep(0.002) #2ms 
-				
-			pwm.stop()
+# used when the correct location for the crate is to be placed
+
+dc0 = 0.05 #1 / 20ms
+dcSub90 = 0.075 #1.5 / 20ms
+
+fork.start(dc)
+fork.ChangeDutyCycle(dc)
+time.sleep(0.002)  # 2ms
+fork.stop()
+
+camera.start(dc)
+camera.ChangeDutyCycle(dc)
+time.sleep(0.002)  # 2ms
+camera.stop()
 #__________
 
 pygame.quit()
