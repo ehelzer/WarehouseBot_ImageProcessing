@@ -1,8 +1,6 @@
 # from Tkinter import Image
 from PIL import Image, ImageOps
 import RPi.GPIO as GPIO
-import time
-import PIL.ImageOps
 # from PIL import zbarlight
 
 import webbrowser
@@ -44,18 +42,15 @@ GPIO.setup(15, GPIO.OUT) #output mode (MSB)
 #------
 
 
-WIDTH = 1280
-HEIGHT = 1024
-qr_found = False
 
-sleep(5)
 
-# INIT CAMERA
-camera = picamera.PiCamera()
-camera.vflip = False
-camera.hflip = False
-camera.brightness = 60
 
+def initCamera():
+    global camera
+    camera = picamera.PiCamera()
+    camera.vflip = False
+    camera.hflip = False
+    camera.brightness = 60
 
 def BuildAScreen():
 	global screen, black
@@ -83,6 +78,13 @@ def imageProcessing():
 		image1.load()
 	codes = zbarlight.scan_codes('qrcode', image1)
 
+WIDTH = 1280
+HEIGHT = 1024
+qr_found = False
+
+sleep(5)
+
+initCamera()
 
 #continuously take a picture
 while True:
@@ -110,8 +112,8 @@ while True:
 		codes = zbarlight.scan_codes('qrcode', image)
 		
 		#cannot find qr code
-		if codes == None:				
-			imageProcessing()
+		#if codes == None:
+		#	imageProcessing()
 		# necessary to check that code
 		if (codes != None):
 			qr_found = True
